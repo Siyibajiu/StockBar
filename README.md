@@ -14,7 +14,10 @@
 
 ## 截图
 
-> 菜单栏常驻显示，点击展开完整面板
+<p align="center">
+  <img src="screenshots/heatmap.png" width="300" alt="热力图模式">
+  <img src="screenshots/barstack.png" width="300" alt="柱状图模式">
+</p>
 
 ## 构建
 
