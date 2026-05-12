@@ -8,7 +8,8 @@ struct StockBarApp: App {
         MenuBarExtra {
             MenuBarView(viewModel: viewModel)
         } label: {
-            Image(systemName: "calendar")
+            Image(systemName: viewModel.menuBarIcon)
+                .foregroundStyle(viewModel.menuBarIconColor)
         }
         .menuBarExtraStyle(.window)
     }

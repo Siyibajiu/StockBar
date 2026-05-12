@@ -111,7 +111,7 @@ struct MenuBarView: View {
                     let rowIds = viewModel.layout[rowIndex]
                     HStack(spacing: 0) {
                         ForEach(rowIds, id: \.self) { stockId in
-                            if let stock = viewModel.stocks.first(where: { $0.id == stockId }) {
+                            if let stock = viewModel.stockDict[stockId] {
                                 stockCard(stock: stock, rowIds: rowIds)
                             }
                         }
@@ -125,7 +125,7 @@ struct MenuBarView: View {
 
             // 持仓编辑区域（底部独立区域）
             if let editId = editingPositionStockId,
-               let stock = viewModel.stocks.first(where: { $0.id == editId }) {
+               let stock = viewModel.stockDict[editId] {
                 HStack(spacing: 6) {
                     Text(viewModel.displayName(for: editId))
                         .font(.system(size: 11, weight: .medium))
@@ -365,10 +365,14 @@ struct MenuBarView: View {
         return String(format: "%@%.0f", sign, absVal)
     }
 
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm:ss"
+        return f
+    }()
+
     private func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return "更新: " + formatter.string(from: date)
+        "更新: " + Self.timeFormatter.string(from: date)
     }
 
     private func addStock() {

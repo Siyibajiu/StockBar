@@ -23,6 +23,9 @@ class StockViewModel {
     var layout: [[String]] = []
     var lastUpdateTime: Date? = nil
 
+    /// O(1) 股票查找字典，与 stocks 同步
+    private(set) var stockDict: [String: Stock] = [:]
+
     /// 当前是否在交易时间（9:30~15:00 工作日）
     var isTradingHours: Bool {
         let now = Calendar.current.dateComponents([.hour, .minute, .weekday], from: Date())
@@ -39,14 +42,14 @@ class StockViewModel {
     /// 获取单只股票的盈亏（持仓涨跌额）
     func profit(for stockId: String) -> Double? {
         guard let pos = positions[stockId],
-              let stock = stocks.first(where: { $0.id == stockId }) else { return nil }
+              let stock = stockDict[stockId] else { return nil }
         return (stock.currentPrice - pos.costPrice) * Double(pos.shares)
     }
 
     /// 获取单只股票的当日涨跌额
     func dailyProfit(for stockId: String) -> Double? {
         guard let pos = positions[stockId],
-              let stock = stocks.first(where: { $0.id == stockId }) else { return nil }
+              let stock = stockDict[stockId] else { return nil }
         return stock.changeAmount * Double(pos.shares)
     }
 
@@ -60,7 +63,7 @@ class StockViewModel {
         if let custom = customNames[stockId] {
             return custom
         }
-        return stocks.first(where: { $0.id == stockId })?.name ?? stockId
+        return stockDict[stockId]?.name ?? stockId
     }
 
     /// 设置自定义名称
@@ -87,13 +90,41 @@ class StockViewModel {
         }
     }
 
+    /// 当日持仓总盈亏
+    var totalDailyProfit: Double? {
+        guard !positions.isEmpty else { return nil }
+        var total = 0.0
+        var hasValue = false
+        for stockId in positions.keys {
+            if let daily = dailyProfit(for: stockId) {
+                total += daily
+                hasValue = true
+            }
+        }
+        return hasValue ? total : nil
+    }
+
+    /// 今天是否已经开盘过（9:30 之后，含收盘后）
+    private var hasMarketOpenedToday: Bool {
+        let now = Calendar.current.dateComponents([.hour, .minute], from: Date())
+        guard let hour = now.hour, let minute = now.minute else { return false }
+        return (hour * 60 + minute) >= (9 * 60 + 30)
+    }
+
     var menuBarIcon: String {
-        guard let first = stocks.first else {
+        guard let total = totalDailyProfit, hasMarketOpenedToday else {
             return "chart.line.uptrend.xyaxis"
         }
-        if first.isUp { return "arrowtriangle.up.fill" }
-        if first.isDown { return "arrowtriangle.down.fill" }
+        if total > 0 { return "arrowtriangle.up.fill" }
+        if total < 0 { return "arrowtriangle.down.fill" }
         return "minus"
+    }
+
+    var menuBarIconColor: Color {
+        guard let total = totalDailyProfit, hasMarketOpenedToday else { return .primary }
+        if total > 0 { return .red }
+        if total < 0 { return .green }
+        return .primary
     }
 
     private let service = StockService()
@@ -155,6 +186,7 @@ class StockViewModel {
     func removeStock(_ id: String) {
         watchedStockIds.removeAll { $0 == id }
         stocks.removeAll { $0.id == id }
+        stockDict.removeValue(forKey: id)
         positions.removeValue(forKey: id)
         displayStyles.removeValue(forKey: id)
         customNames.removeValue(forKey: id)
@@ -343,6 +375,7 @@ class StockViewModel {
             let results = try await service.fetchStocks(stockIds: validIds)
             await MainActor.run {
                 self.stocks = results
+                self.stockDict = Dictionary(uniqueKeysWithValues: results.map { ($0.id, $0) })
                 self.lastUpdateTime = Date()
                 self.isLoading = false
             }
